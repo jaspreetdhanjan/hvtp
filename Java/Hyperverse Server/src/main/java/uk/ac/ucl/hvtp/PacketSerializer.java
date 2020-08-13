@@ -7,11 +7,11 @@ public class PacketSerializer {
 	private PacketSerializer() {
 	}
 
-	private static byte[] toAscii(String string) {
+	public static byte[] toAscii(String string) {
 		return string.getBytes(StandardCharsets.US_ASCII);
 	}
 
-	private static String fromAscii(byte[] bytes) {
+	public static String fromAscii(byte[] bytes) {
 		return new String(bytes, StandardCharsets.US_ASCII);
 	}
 
@@ -54,17 +54,42 @@ public class PacketSerializer {
 //		return byteArrayOutputStream.toByteArray();
 //	}
 
-	public static PacketHeader deserializeHeader(byte[] bytes) throws IOException {
-		ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(bytes);
-		DataInputStream dis = new DataInputStream(byteArrayInputStream);
+	public static Packet deserialize(InputStream stream) throws IOException {
+		DataInputStream dis = new DataInputStream(stream);
 
 		String magic = fromAscii(dis.readNBytes(4));
 		int version = dis.readInt();
 		int length = dis.readInt();
 		String type = fromAscii(dis.readNBytes(4));
 
-		return new PacketHeader(magic, version, length, type);
+		PacketHeader header = new PacketHeader(magic, version, length, type);
+
+		dumpHeaders(System.out, header);
+
+		byte[] payload = dis.readNBytes(length);
+
+		return new Packet(header, payload);
 	}
+
+//	public static PacketHeader deserializeHeader(InputStream stream) throws IOException {
+//		DataInputStream dis = new DataInputStream(stream);
+//
+//		String magic = fromAscii(dis.readNBytes(4));
+//		int version = dis.readInt();
+//		int length = dis.readInt();
+//		String type = fromAscii(dis.readNBytes(4));
+//
+//		System.out.println("Magic is " + magic);
+//		System.out.println("Version is " + version);
+//		System.out.println("Length is " + length);
+//		System.out.println("Type is " + type);
+//
+//		return new PacketHeader(magic, version, length, type);
+//	}
+
+//	public static PacketHeader deserializeHeader(byte[] bytes) throws IOException {
+//		return deserializeHeader(new ByteArrayInputStream(bytes));
+//	}
 
 	public static void dumpHeaders(PrintStream o, PacketHeader... headers) {
 		for (PacketHeader header : headers) {
@@ -73,13 +98,5 @@ public class PacketSerializer {
 			o.println(header.getLength());
 			o.println(header.getType());
 		}
-	}
-
-	public static void main(String[] args) throws Exception {
-		PacketHeader header = new PacketHeader("HVTP", 1, 0, "INIT");
-		byte[] bytes = serialize(new Packet(header, new byte[0]));
-
-		dumpHeaders(System.out, deserializeHeader(bytes));
-
 	}
 }

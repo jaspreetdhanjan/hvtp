@@ -32,4 +32,18 @@ public class PacketHeader implements Serializable {
 	public String getType() {
 		return type;
 	}
+
+	public String toString() {
+		StringBuilder sb = new StringBuilder();
+		sb.append("Packet");
+		sb.append("\nMagic:\t");
+		sb.append(magic);
+		sb.append("\nVersion:\t");
+		sb.append(version);
+		sb.append("\nLength:\t");
+		sb.append(length);
+		sb.append("\nType:\t");
+		sb.append(type);
+		return sb.toString();
+	}
 }

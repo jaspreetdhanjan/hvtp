@@ -6,95 +6,79 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.Socket;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class HyperverseClient implements Runnable, IHyperverseClient {
 	private static final Logger LOGGER = HyperverseLogger.getLogger(HyperverseClient.class.getName());
-	private static final AtomicLong COUNTER = new AtomicLong();
 
-	private final Socket socket;
+	private volatile boolean stop = false;
 
-	private volatile boolean running = true;
-
-	private Thread thread;
+	private Socket socket;
 	private OnPacketCallback callback;
 
-	public HyperverseClient(Socket socket) {
+	public HyperverseClient(Socket socket, OnPacketCallback callback) {
 		this.socket = socket;
-	}
-
-	@Override
-	public void create() {
-		if (running) {
-			return;
-		}
-
-		running = true;
-
-		thread = new Thread(this);
-		thread.setName("Hyperverse Client #" + COUNTER.incrementAndGet());
-		thread.start();
-	}
-
-	@Override
-	public void setCallback(OnPacketCallback callback) {
 		this.callback = callback;
 	}
 
 	@Override
 	public void run() {
-		while (running) {
+		while (!stop) {
 			try {
 				Packet packet = receivePacket();
 
+				System.out.println("RECEIEVED");
+
 				if (callback != null) {
-					callback.onPacketReceived(packet);
+					callback.onPacketReceived(this, packet);
 				} else {
 					LOGGER.log(Level.ALL, "No callback set! Message thrown away...");
 				}
 			} catch (IOException e) {
 				LOGGER.log(Level.ALL, "Error receiving message from client", e);
-				e.printStackTrace();
+
+				try {
+					close();
+				} catch (IOException ex) {
+				}
 			}
 		}
 	}
 
 	private Packet receivePacket() throws IOException {
-		InputStream inputStream = socket.getInputStream();
+		InputStream in = socket.getInputStream();
 
-		byte[] bytes = inputStream.readNBytes(PacketHeader.SIZE_IN_BYTES);
+		LOGGER.log(Level.ALL, "Received message from %s", socket.toString());
 
-		PacketHeader header = PacketSerializer.deserializeHeader(bytes);
+//		PacketHeader header = PacketSerializer.deserializeHeader(in);
+//		byte[] payload = in.readNBytes(header.getLength());
+//		return new Packet(header, payload);
 
-		byte[] payload = inputStream.readNBytes(header.getLength());
+		Packet packet = PacketSerializer.deserialize(in);
 
-		return new Packet(header, payload);
+		return packet;
 	}
 
 	public synchronized void sendPacket(Packet packet) throws IOException {
 		byte[] bytes = PacketSerializer.serialize(packet);
 
-//		out.write(bytes);
 		OutputStream outputStream = socket.getOutputStream();
 		outputStream.write(bytes);
 	}
 
 	@Override
+	public boolean isStopped() {
+		return stop;
+	}
+
+	@Override
 	public void close() throws IOException {
-		if (!running) {
+		if (stop) {
 			return;
 		}
-
-		running = false;
-
-		try {
-			thread.join(1000);
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		}
-
+		stop = true;
 		socket.close();
+		socket = null;
 	}
 }

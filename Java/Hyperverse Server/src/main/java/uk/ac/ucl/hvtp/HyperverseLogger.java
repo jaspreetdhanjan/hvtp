@@ -4,6 +4,9 @@ import java.io.IOException;
 import java.util.logging.*;
 
 public class HyperverseLogger {
+	private HyperverseLogger() {
+	}
+
 	public static Logger getLogger(String name) {
 		Logger logger = Logger.getLogger(name);
 		logger.setLevel(Level.ALL);

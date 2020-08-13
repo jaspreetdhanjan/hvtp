@@ -1,53 +1,37 @@
 package uk.ac.ucl.hvtp.server;
 
-import uk.ac.ucl.hvtp.HyperverseLogger;
-import uk.ac.ucl.hvtp.OnPacketCallback;
-import uk.ac.ucl.hvtp.Packet;
-import uk.ac.ucl.hvtp.PacketHeader;
+import uk.ac.ucl.hvtp.*;
 import uk.ac.ucl.hvtp.client.HyperverseClient;
 import uk.ac.ucl.hvtp.client.IHyperverseClient;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.List;
-import java.util.Queue;
-import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class HyperverseServer implements Runnable, IHyperverseServer {
 	private static final Logger LOGGER = HyperverseLogger.getLogger(HyperverseServer.class.getName());
 
-	private final byte[] initialPayload;
+	private final SceneGraph sceneGraph;
 
 	private volatile boolean running = false;
 	private ServerSocket socket;
 	private List<IHyperverseClient> clients = new ArrayList<>();
+	private volatile PacketQueueProcessor pqp = new PacketQueueProcessor(this);
 
-	private Queue<Packet> packetQueue = new ConcurrentLinkedDeque<>();
-
-	private OnPacketCallback callback = packet -> {
+	private OnPacketCallback callback = (client, packet) -> {
 		LOGGER.log(Level.ALL, String.format("Received %s message from client", packet.getHeader().getType()));
-		packetQueue.add(packet);
+		pqp.add(new Message(client, packet));
 	};
 
-	public HyperverseServer() {
-		this.initialPayload = loadSceneGraph();
-	}
-
-	private static byte[] loadSceneGraph() {
-		InputStream is = HyperverseServer.class.getResourceAsStream("/hyperverse.glb");
-
-		try {
-			return is.readAllBytes();
-		} catch (IOException e) {
-			throw new RuntimeException(e);
-		}
+	public HyperverseServer(SceneGraph sceneGraph) {
+		this.sceneGraph = sceneGraph;
 	}
 
 	@Override
@@ -60,8 +44,11 @@ public class HyperverseServer implements Runnable, IHyperverseServer {
 			socket = new ServerSocket(port);
 			running = true;
 		} catch (IOException e) {
-			e.printStackTrace();
+			LOGGER.log(Level.ALL, "Fatal: Could not start server at port " + port, e);
+			throw new RuntimeException(e);
 		}
+
+		pqp.start();
 
 		LOGGER.log(Level.ALL, "Starting up server...");
 	}
@@ -70,44 +57,76 @@ public class HyperverseServer implements Runnable, IHyperverseServer {
 	public void run() {
 		while (running) {
 			try {
-				update();
+				// We will block here until a new TCP connection is opened.
+
+				Socket newSocket = socket.accept();
+
+				HyperverseClient client = new HyperverseClient(newSocket, callback);
+
+				new Thread(client).start();
+
+				// Keep track of this client.
+
+				clients.add(client);
+
+				// Pass an INIT message to the client containing the entire scene-graph.
+
+				client.sendPacket(newInitPacket());
+
+				LOGGER.log(Level.ALL, String.format("New client (%s) connected to server!", newSocket.getInetAddress()));
+				LOGGER.log(Level.ALL, String.format("Sending INIT packet to client (%s)", newSocket.getInetAddress()));
 			} catch (IOException e) {
-				e.printStackTrace();
 				LOGGER.log(Level.ALL, "An error occurred within the server update", e);
-				break;
 			}
 		}
 	}
 
-	private void update() throws IOException {
-		// We will wait here until a new TCP connection is opened.
+	public Packet newInitPacket() {
+		byte[] payload = sceneGraph.getBytes();
 
-		Socket newSocket = socket.accept();
+		PacketHeader header = new PacketHeader(HVTPConstants.MAGIC,
+				HVTPConstants.VERSION_1,
+				payload.length,
+				HVTPConstants.INIT);
 
-		IHyperverseClient client = new HyperverseClient(newSocket);
-		client.create();
-		client.setCallback(callback);
-
-		// Keep track of this client.
-
-		clients.add(client);
-
-		// Pass an INIT message to the client containing the entire scene-graph.
-
-		client.sendPacket(newInitPacket());
-
-		LOGGER.log(Level.ALL, String.format("New client (%s) connected to server!", newSocket.getInetAddress()));
-		LOGGER.log(Level.ALL, String.format("Sending INIT packet to client (%s)", newSocket.getInetAddress()));
-	}
-
-	private Packet newInitPacket() {
-		PacketHeader header = new PacketHeader("HVTP", 1, initialPayload.length, "INIT");
-		return new Packet(header, initialPayload);
+		return new Packet(header, payload);
 	}
 
 	@Override
 	public Collection<IHyperverseClient> getClients() {
 		return clients;
+	}
+
+	@Override
+	public void retransmitToAll(Message message) {
+		IHyperverseClient except = message.getAuthor();
+
+		Iterator<IHyperverseClient> iterator = clients.iterator();
+
+		while (iterator.hasNext()) {
+			IHyperverseClient client = iterator.next();
+
+			if (client.isStopped()) {
+				iterator.remove();
+				continue;
+			}
+
+			if (client == except) {
+				continue;
+			}
+
+			try {
+				client.sendPacket(message.getPacket());
+			} catch (IOException e) {
+				LOGGER.log(Level.ALL, "ERROR retransmitting message to other clients");
+				e.printStackTrace();
+			}
+		}
+	}
+
+	@Override
+	public SceneGraph getSceneGraph() {
+		return sceneGraph;
 	}
 
 	@Override
@@ -121,8 +140,15 @@ public class HyperverseServer implements Runnable, IHyperverseServer {
 	}
 
 	@Override
+	public void addClient(IHyperverseClient client) {
+		clients.add(client);
+	}
+
+	@Override
 	public void close() throws IOException {
 		running = false;
+
+		pqp.stop();
 
 		for (Closeable client : clients) {
 			client.close();
@@ -132,9 +158,9 @@ public class HyperverseServer implements Runnable, IHyperverseServer {
 	}
 
 	public static void main(String[] args) {
-		HyperverseServer server = new HyperverseServer();
+		HyperverseServer server = new HyperverseServer(new SceneGraph());
 		server.create("localhost", 8088);
 
-		new Thread(server).start();
+		new Thread(server, "Hyperverse Server Thread").start();
 	}
 }

@@ -22,4 +22,8 @@ public class Packet implements Serializable {
 	public byte[] getPayload() {
 		return payload;
 	}
+
+	public String toString() {
+		return header.toString();
+	}
 }
