@@ -61,6 +61,8 @@ public class HyperverseServer implements Runnable, IHyperverseServer {
 
 				Socket newSocket = socket.accept();
 
+				LOGGER.log(Level.ALL, String.format("New client (%s) connected to server!", newSocket.getInetAddress()));
+
 				HyperverseClient client = new HyperverseClient(newSocket, callback);
 
 				new Thread(client).start();
@@ -73,7 +75,6 @@ public class HyperverseServer implements Runnable, IHyperverseServer {
 
 				client.sendPacket(newInitPacket());
 
-				LOGGER.log(Level.ALL, String.format("New client (%s) connected to server!", newSocket.getInetAddress()));
 				LOGGER.log(Level.ALL, String.format("Sending INIT packet to client (%s)", newSocket.getInetAddress()));
 			} catch (IOException e) {
 				LOGGER.log(Level.ALL, "An error occurred within the server update", e);

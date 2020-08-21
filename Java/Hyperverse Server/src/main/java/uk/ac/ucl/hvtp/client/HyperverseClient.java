@@ -37,6 +37,7 @@ public class HyperverseClient implements Runnable, IHyperverseClient {
 				}
 			} catch (IOException e) {
 				LOGGER.log(Level.ALL, "Error receiving message from client", e);
+				LOGGER.log(Level.ALL, "Closing the connection");
 
 				try {
 					close();
@@ -49,15 +50,12 @@ public class HyperverseClient implements Runnable, IHyperverseClient {
 	private Packet receivePacket() throws IOException {
 		InputStream in = socket.getInputStream();
 
-		LOGGER.log(Level.ALL, "Received message from %s", socket.toString());
+		LOGGER.log(Level.ALL, String.format("Received message from %s", socket.toString()));
 
-//		PacketHeader header = PacketSerializer.deserializeHeader(in);
-//		byte[] payload = in.readNBytes(header.getLength());
-//		return new Packet(header, payload);
+		PacketHeader header = PacketSerializer.deserializeHeader(in);
 
-		Packet packet = PacketSerializer.deserialize(in);
-
-		return packet;
+		byte[] payload = in.readNBytes(header.getLength());
+		return new Packet(header, payload);
 	}
 
 	public synchronized void sendPacket(Packet packet) throws IOException {

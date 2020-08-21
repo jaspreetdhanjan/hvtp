@@ -55,20 +55,22 @@ public class PacketQueueProcessor implements Runnable {
 		while (running) {
 			try {
 				Message message = queue.take();
-
-				Packet packet = message.getPacket();
-				PacketHeader header = packet.getHeader();
-
-				LOGGER.log(Level.ALL, "Processing packet... " + header.getType());
-
-				applyChange(header.getType(), packet.getPayload());
-
-				server.retransmitToAll(message);
-
+				process(message);
 			} catch (InterruptedException e) {
 				Thread.currentThread().interrupt();
 			}
 		}
+	}
+
+	private void process(Message message) {
+		Packet packet = message.getPacket();
+		PacketHeader header = packet.getHeader();
+
+		LOGGER.log(Level.ALL, "Processing packet... " + header.getType());
+
+		applyChange(header.getType(), packet.getPayload());
+
+		server.retransmitToAll(message);
 	}
 
 	private void applyChange(String type, byte[] payload) {
@@ -79,10 +81,10 @@ public class PacketQueueProcessor implements Runnable {
 				sceneGraph.setBytes(payload);
 				break;
 			case HVTPConstants.UPDT:
-//			sceneGraph.applyDiff(payload);
+				//sceneGraph.applyUpdate(payload);
 				break;
 			case HVTPConstants.TRNS:
-//			sceneGraph.applyDiff(payload);
+				//sceneGraph.applyTranslation(payload);
 				break;
 			default:
 				LOGGER.log(Level.ALL, "Unsupported message type has been received... What do we do?");

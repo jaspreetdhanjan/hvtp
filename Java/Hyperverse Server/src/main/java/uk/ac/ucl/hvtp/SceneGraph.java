@@ -2,7 +2,14 @@ package uk.ac.ucl.hvtp;
 
 import uk.ac.ucl.hvtp.server.HyperverseServer;
 
-import java.io.*;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
+import java.nio.channels.OverlappingFileLockException;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 
 /**
  * Represents a GLB scene.
@@ -11,9 +18,11 @@ import java.io.*;
  */
 
 public class SceneGraph {
-	private static final String PATH = "/hyperverse.glb";
+//	private static final String PATH = "/test/ClientScene.glb";
+	private static final String PATH = "/floor.glb";
+//	private static final String PATH = "/hyperverse.glb";
 
-	private byte[] bytes;
+	private volatile byte[] bytes;
 
 	/**
 	 * We need a path on disk to save a persistent store of the scene-graph.
@@ -23,61 +32,84 @@ public class SceneGraph {
 	 */
 
 	public SceneGraph() {
-		load();
-
-		if (!isValid())
-			throw new RuntimeException("Not correct GLB format");
-
+		bytes = load();
 	}
 
-	public void setBytes(byte[] bytes) {
+	public synchronized void setBytes(byte[] bytes) {
 		this.bytes = bytes;
-		//saveBytes();
+//		saveBytes();
 	}
 
 	private void saveBytes() {
-		new Thread(this::save).start();
+		new Thread(() -> SceneGraph.save(bytes)).start();
 	}
 
 	public byte[] getBytes() {
 		return bytes;
 	}
 
-	private void load() {
+	private static synchronized byte[] load() {
 		try {
-			synchronized (this) {
-				InputStream is = HyperverseServer.class.getResourceAsStream(PATH);
-				bytes = is.readAllBytes();
-				is.close();
+			System.out.println("Loading GLB bytes from disk...");
+
+			InputStream is = HyperverseServer.class.getResourceAsStream(PATH);
+			byte[] bytes = is.readAllBytes();
+			is.close();
+
+			// Check if what we have is an actual GLB file.
+			if (!isMagicValid(Arrays.copyOfRange(bytes, 0, 4))) {
+				throw new RuntimeException("Not correct GLB format");
 			}
+
+			return bytes;
 		} catch (IOException e) {
 			System.err.print("Fatal: Could not load scene-graph bytes from disk. Cannot startup server. " + e);
 			throw new RuntimeException(e);
 		}
 	}
 
-	private void save() {
+	private static boolean isMagicValid(byte[] magic) {
+		return new String(magic, StandardCharsets.US_ASCII).equals("glTF");
+	}
+
+	private static synchronized void save(byte[] bytes) {
 		try {
-			synchronized (this) {
-				OutputStream os = new FileOutputStream(PATH, false);
-				os.write(bytes);
+			System.out.println("Saving GLB bytes to disk...");
+
+			FileOutputStream os = new FileOutputStream(PATH, false);
+			FileChannel channel = os.getChannel();
+
+			FileLock lock = null;
+			try {
+				lock = channel.tryLock();
+			} catch (OverlappingFileLockException ofle) {
 				os.close();
+				channel.close();
 			}
+
+			os.write(bytes);
+
+			if (lock != null) {
+				lock.release();
+			}
+			channel.close();
+			os.close();
+
 		} catch (IOException e) {
-			System.err.print("Fatal: Could not load scene-graph bytes from disk. Cannot startup server. " + e);
+			System.err.print("Fatal: Could not save scene-graph bytes from disk. Cannot startup server. " + e);
 			throw new RuntimeException(e);
 		}
 	}
 
-	private boolean isValid() {
-		ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(bytes);
-		try {
-			String magic = PacketSerializer.fromAscii(byteArrayInputStream.readNBytes(4));
-			return magic.equals("glTF");
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-
-		return false;
-	}
+//	private boolean isValid() {
+//		ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(bytes);
+//		try {
+//			String magic = PacketSerializer.fromAscii(byteArrayInputStream.readNBytes(4));
+//			return magic.equals("glTF");
+//		} catch (IOException e) {
+//			e.printStackTrace();
+//		}
+//
+//		return false;
+//	}
 }
