@@ -16,6 +16,8 @@ import select
 
 import HVTPConstants
 
+# OUTDATED SERVER
+
 class HVTPServer:
     def __init__(self, scenegraph):
         """
@@ -118,7 +120,7 @@ class HVTPServer:
 
                 #scenegraph_encoded = self.scenegraph.encode(HVTPConstants.HVTP_ENCODING)
 
-                scenegraph_file = open("Duck.glb", "rb")
+                scenegraph_file = open(self.scenegraph, "rb")
                 scenegraph_encoded = scenegraph_file.read()
                 scenegraph_file.close()
 
