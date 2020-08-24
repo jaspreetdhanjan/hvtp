@@ -103,7 +103,7 @@ class HVTPClient:
                 payload = self.client_socket.recv(hvtp_length)
 
                 loaded_payload = trimesh.load(BytesIO(payload), file_type='glb')
-                
+               
                 mesh = Mesh.from_trimesh(list(loaded_payload.dump()))
                 
                 # Add to the scene
