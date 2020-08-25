@@ -28,7 +28,8 @@ public float walkingSpeed = 7.5f;
         characterController = GetComponent<CharacterController>();
 
         // Lock cursor
-        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.lockState = CursorLockMode.Confined;
+        //Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
     }
 

@@ -26,4 +26,9 @@ public class Packet implements Serializable {
 	public String toString() {
 		return header.toString();
 	}
+
+	public static Packet newInitPacket(byte[] payload) {
+		return new Packet(new PacketHeader(HVTPConstants.MAGIC, HVTPConstants.VERSION_1, payload.length, HVTPConstants.INIT), payload);
+	}
+
 }

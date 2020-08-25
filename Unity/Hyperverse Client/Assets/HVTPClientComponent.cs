@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Collections;
+using System.IO.Compression;
 using System.Threading;
 using System.Collections.Generic;
 using UnityEngine;
@@ -36,7 +37,7 @@ public class HVTPClientComponent : MonoBehaviour
 
     public GameObject hyperverseRoot;
 
-    private int dirtySize;
+    private byte[] lastBytes;
 
     private string RetrieveTexturePath(UnityEngine.Texture texture)
     {
@@ -90,6 +91,7 @@ public class HVTPClientComponent : MonoBehaviour
         // Define the publiclyVisible=true, otherwise will get an error.
         // https://stackoverflow.com/questions/1646193/why-does-memorystream-getbuffer-always-throw
 
+        lastBytes = bytes;
         Stream stream = new MemoryStream(bytes, 0, bytes.Length, false, true);
 
 		GLTFRoot gLTFRoot;
@@ -182,20 +184,120 @@ public class HVTPClientComponent : MonoBehaviour
     
     private void OnChangeInHyperverse()
     {
-        Debug.Log("Something has changed!! Sending packet...");
+        //Debug.Log("Something has changed!! Sending packet...");
+
+        //byte[] bytes = SaveGLB();
+
+        //Packet packet = NewInitPacket(bytes);
+
+        //client.SendPacket(packet);
+
+        //ResetSceneGraph();
+
+        // ------------- The UPDT packet implementation
 
         byte[] bytes = SaveGLB();
 
-        Packet packet = NewInitPacket(bytes);
+        byte[] xor = Diff(bytes, lastBytes);
+
+        byte[] compressed = Zip(xor);
+
+        Debug.Log("Original: " + bytes.Length);
+        Debug.Log("Diff size is: " + xor.Length);
+        Debug.Log("Compressed diff size is: " + compressed.Length);
+
+        Packet packet = NewUpdtPacket(compressed);
 
         client.SendPacket(packet);
 
         ResetSceneGraph();
+
+        lastBytes = bytes;
+    }
+
+    private byte[] Zip(byte[] bytes)
+    {
+        using (MemoryStream msi = new MemoryStream(bytes))
+        using (MemoryStream mso = new MemoryStream())
+        {
+            using (GZipStream gs = new GZipStream(mso, CompressionMode.Compress))
+            {
+                //msi.CopyTo(gs);
+                CopyTo(msi, gs);
+            }
+
+            return mso.ToArray();
+        }
+    }
+
+    private byte[] Unzip(byte[] bytes)
+    {
+        using (MemoryStream msi = new MemoryStream(bytes))
+        using (MemoryStream mso = new MemoryStream())
+        {
+            using (GZipStream gs = new GZipStream(msi, CompressionMode.Decompress))
+            {
+                //gs.CopyTo(mso);
+                CopyTo(gs, mso);
+            }
+
+            return mso.ToArray();
+        }
+    }
+
+    private void CopyTo(Stream src, Stream dest)
+    {
+        byte[] bytes = new byte[4096];
+
+        int cnt;
+
+        while ((cnt = src.Read(bytes, 0, bytes.Length)) != 0)
+        {
+            dest.Write(bytes, 0, cnt);
+        }
+    }
+
+    private byte[] Diff(byte[] left, byte[] right)
+    {
+        int minSize = Math.Min(left.Length, right.Length);
+        int maxSize = Math.Max(left.Length, right.Length);
+
+        byte[] result = new byte[maxSize];
+
+        int sourcePointer;
+
+        for (sourcePointer = 0; sourcePointer < minSize; sourcePointer++)
+        {
+            result[sourcePointer] = (byte) (left[sourcePointer] ^ right[sourcePointer]);
+        }
+
+        // Any leftover bytes are just a copy of the largest GLB file.
+
+        while (sourcePointer < maxSize)
+        {
+            if (left.Length > right.Length)
+            {
+                result[sourcePointer] = left[sourcePointer];
+            }
+            else if (right.Length > left.Length)
+            {
+                result[sourcePointer] = right[sourcePointer];
+            }
+            sourcePointer++;
+        }
+
+        return result;
     }
 
     private Packet NewInitPacket(byte[] payload)
     {
         PacketHeader header = new PacketHeader("HVTP", 1, "INIT", payload.Length);
+        return new Packet(header, payload);
+    }
+
+    private Packet NewUpdtPacket(byte[] payload)
+    {
+        PacketHeader header = new PacketHeader("HVTP", 1, "UPDT", payload.Length);
         return new Packet(header, payload);
     }
 

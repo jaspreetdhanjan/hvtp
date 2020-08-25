@@ -33,7 +33,7 @@ class HVTPClient:
         """
         """
 
-        self.scene = Scene(ambient_light=np.array([0.02, 0.02, 0.02, 1.0]))
+        self.scene = Scene(ambient_light=np.array([0.2, 0.2, 0.2, 1.0]))
         self.scene.add(PointLight(color=[0.5, 0.2, 0.3], intensity=2.0))
         self.scene.add(SpotLight(color=[0.1, 0.6, 0.3], intensity=2.0, innerConeAngle=0.05, outerConeAngle=0.5))
         self.scene.add(DirectionalLight(color=[0.33, 0.33, 0.33], intensity=2.0))

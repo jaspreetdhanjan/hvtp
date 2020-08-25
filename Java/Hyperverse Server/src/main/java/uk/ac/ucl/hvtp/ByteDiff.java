@@ -4,8 +4,8 @@ import java.util.Arrays;
 
 public class ByteDiff {
 	public static void main(String[] args) {
-		byte[] a = {1, 0, 0, 1, 0, 1, 0, 1};
-		byte[] b = {1, 0, 0, 1, 0, 1, 0, 1};
+		byte[] a = {1, 0, 0, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1};
+		byte[] b = {1, 0, 0, 1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1};
 
 		// 01101010001
 		// 01100101010
@@ -29,7 +29,7 @@ public class ByteDiff {
 
 		System.out.println("A:\t" + Arrays.toString(a));
 		System.out.println("B:\t" + Arrays.toString(b));
-		System.out.println("diff:\t" + Arrays.toString(flaggedBits(a, b)));
+		System.out.println("DF:\t" + Arrays.toString(flaggedBits(a, b)));
 	}
 
 	private static byte[] flaggedBits(byte[] a, byte[] b) {

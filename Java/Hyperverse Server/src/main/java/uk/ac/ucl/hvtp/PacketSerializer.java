@@ -21,8 +21,6 @@ public class PacketSerializer {
 
 		PacketHeader header = packet.getHeader();
 
-		dumpHeaders(System.out, header);
-
 		dos.write(toAscii(header.getMagic()));
 		dos.writeInt(header.getVersion());
 		dos.writeInt(header.getLength());
@@ -66,7 +64,7 @@ public class PacketSerializer {
 
 		PacketHeader header = new PacketHeader(magic, version, length, type);
 
-		dumpHeaders(System.out, header);
+//		PacketSerializer.dumpHeaders(System.out, header);
 
 		byte[] payload = dis.readNBytes(length);
 
@@ -81,7 +79,11 @@ public class PacketSerializer {
 		int length = dis.readInt();
 		String type = fromAscii(dis.readNBytes(4));
 
-		return new PacketHeader(magic, version, length, type);
+		PacketHeader header = new PacketHeader(magic, version, length, type);
+
+//		PacketSerializer.dumpHeaders(System.out, header);
+
+		return header;
 	}
 
 //	public static PacketHeader deserializeHeader(byte[] bytes) throws IOException {
@@ -89,6 +91,8 @@ public class PacketSerializer {
 //	}
 
 	public static void dumpHeaders(PrintStream o, PacketHeader... headers) {
+		o.println("Time: " + System.currentTimeMillis());
+
 		for (PacketHeader header : headers) {
 			o.println("Header is: " + header.getMagic());
 			o.println("Version is: " + header.getVersion());

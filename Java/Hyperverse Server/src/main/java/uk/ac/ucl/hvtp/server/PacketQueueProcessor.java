@@ -68,9 +68,16 @@ public class PacketQueueProcessor implements Runnable {
 
 		LOGGER.log(Level.ALL, "Processing packet... " + header.getType());
 
+		PacketSerializer.dumpHeaders(System.out, header);
+
 		applyChange(header.getType(), packet.getPayload());
 
-		server.retransmitToAll(message);
+//		server.retransmitToAll(message);
+
+		// For now just retransmit the entire scene-graph. Probably need to mention this in the report.
+
+		Packet newPacket = Packet.newInitPacket(server.getSceneGraph().getBytes());
+		server.retransmitToAll(new Message(message.getAuthor(), newPacket));
 	}
 
 	private void applyChange(String type, byte[] payload) {
@@ -81,7 +88,7 @@ public class PacketQueueProcessor implements Runnable {
 				sceneGraph.setBytes(payload);
 				break;
 			case HVTPConstants.UPDT:
-				//sceneGraph.applyUpdate(payload);
+				sceneGraph.applyUpdate(payload);
 				break;
 			case HVTPConstants.TRNS:
 				//sceneGraph.applyTranslation(payload);
@@ -90,15 +97,5 @@ public class PacketQueueProcessor implements Runnable {
 				LOGGER.log(Level.ALL, "Unsupported message type has been received... What do we do?");
 				break;
 		}
-	}
-
-	public static void main(String[] args) {
-//		PacketQueueProcessor pqp = new PacketQueueProcessor(null);
-//		pqp.start();
-
-//		for (int i = 0; i < 10000; i++)
-//			pqp.add(new Packet(new PacketHeader("OMNIVERSE", i, 0, "INIT"), new byte[0]));
-
-		//pqp.stop();
 	}
 }

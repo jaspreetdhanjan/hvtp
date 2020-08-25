@@ -2,14 +2,13 @@ package uk.ac.ucl.hvtp;
 
 import uk.ac.ucl.hvtp.server.HyperverseServer;
 
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.nio.channels.OverlappingFileLockException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.zip.GZIPInputStream;
 
 /**
  * Represents a GLB scene.
@@ -18,7 +17,7 @@ import java.util.Arrays;
  */
 
 public class SceneGraph {
-//	private static final String PATH = "/test/ClientScene.glb";
+	//	private static final String PATH = "/test/ClientScene.glb";
 	private static final String PATH = "/floor.glb";
 //	private static final String PATH = "/hyperverse.glb";
 
@@ -38,6 +37,52 @@ public class SceneGraph {
 	public synchronized void setBytes(byte[] bytes) {
 		this.bytes = bytes;
 //		saveBytes();
+	}
+
+	public synchronized void applyUpdate(byte[] xorBytesCompressed) {
+		// Step 1: Dezip
+
+		byte[] decompressedBytes = null;
+
+		try (ByteArrayInputStream bis = new ByteArrayInputStream(xorBytesCompressed);
+		     ByteArrayOutputStream bos = new ByteArrayOutputStream();
+		     GZIPInputStream gzipIS = new GZIPInputStream(bis)) {
+
+			byte[] buffer = new byte[1024];
+			int len;
+			while ((len = gzipIS.read(buffer)) != -1) {
+				bos.write(buffer, 0, len);
+			}
+
+			decompressedBytes = bos.toByteArray();
+		} catch (IOException e) {
+			throw new RuntimeException("Error decompressing bytes from UPDT packet type", e);
+		}
+
+		int minSize = Math.min(decompressedBytes.length, bytes.length);
+		int maxSize = Math.max(decompressedBytes.length, bytes.length);
+
+		byte[] updatedSceneGraph = new byte[maxSize];
+
+		// The inverse of XOR is... XOR!
+
+		int sourcePointer;
+		for (sourcePointer = 0; sourcePointer < minSize; sourcePointer++) {
+			updatedSceneGraph[sourcePointer] = (byte) (bytes[sourcePointer] ^ decompressedBytes[sourcePointer]);
+		}
+
+		// Any leftover bytes are just a copy of the largest GLB file.
+
+		while (sourcePointer < maxSize) {
+			if (decompressedBytes.length > bytes.length) {
+				updatedSceneGraph[sourcePointer] = decompressedBytes[sourcePointer];
+			} else if (bytes.length > decompressedBytes.length) {
+				updatedSceneGraph[sourcePointer] = bytes[sourcePointer];
+			}
+			sourcePointer++;
+		}
+
+		setBytes(updatedSceneGraph);
 	}
 
 	private void saveBytes() {
