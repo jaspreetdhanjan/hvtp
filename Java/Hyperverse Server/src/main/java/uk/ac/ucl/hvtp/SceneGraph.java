@@ -19,8 +19,8 @@ import java.util.Arrays;
 
 public class SceneGraph {
 //	private static final String PATH = "/test/ClientScene.glb";
-	private static final String PATH = "/floor.glb";
-//	private static final String PATH = "/hyperverse.glb";
+//	private static final String PATH = "/floor.glb";
+	private static final String PATH = "/hyperverse.glb";
 
 	private volatile byte[] bytes;
 

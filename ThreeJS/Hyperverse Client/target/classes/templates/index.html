@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Hyperverse Client [three.js]</title>
+
+    <style>
+        body { margin: 0; }
+        canvas { display: block; }
+    </style>
+
+</head>
+
+<body>
+    <script src="three.js"></script>
+    <script src="GLTFLoader.js"></script>
+<!--    <script src="https://cdn.rawgit.com/mrdoob/three.js/master/examples/js/loaders/GLTFLoader.js"></script>-->
+
+    <script>
+        // Starting the scene
+
+        const gltfLoader = new THREE.GLTFLoader();
+
+        var scene = new THREE.Scene();
+        var camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000 );
+
+        var renderer = new THREE.WebGLRenderer();
+        renderer.setSize( window.innerWidth, window.innerHeight );
+        document.body.appendChild( renderer.domElement );
+
+        camera.position.z = 5;
+        camera.position.y = 2;
+        camera.position.x = -2;
+
+        // Setting up the WebSocket handler
+
+        var ws = new WebSocket("ws://localhost:4567/websocket/hyperverse");
+        ws.binaryType = "arraybuffer";
+
+        ws.onopen = function(event) {
+            console.log("Connection opened!");
+        };
+
+        ws.onmessage = function(event) {
+            // HVTP packets are composed of binary blobs. Read via FileReader
+
+            console.log(event.data);
+
+            var arrayBuffer = event.data;
+            var hvtp_header = arrayBuffer.slice(0, 16);
+            var hvtp_payload = arrayBuffer.slice(16, arrayBuffer.length);
+
+            gltfLoader.parse(hvtp_payload, "", (gltf) => {
+                // Clear the existing scene
+
+                while(scene.children.length > 0){
+                    scene.remove(scene.children[0]);
+                }
+
+                // Add in the new scene-graph with lights
+
+                var whiteLight = new THREE.PointLight(0xffffff, 1, 20, 0.8);
+                whiteLight.position.set(5, 5, -15);
+                scene.add(whiteLight);
+
+                var redLight = new THREE.PointLight(0xff0000, 1, 20, 0.8);
+                redLight.position.set(1, 7.5, 10);
+                scene.add(redLight);
+
+                var blueLight = new THREE.PointLight(0x0000ff, 1, 20, 0.8);
+                blueLight.position.set(10, 7.5, 1);
+                scene.add(blueLight);
+
+                scene.add(gltf.scene);
+
+                console.log("Loaded the scene-graph!!");
+
+                // Draw the changes
+
+                renderer.render( scene, camera );
+            });
+        };
+
+        ws.onclose = function(event) {
+            console.log("Connection closed!");
+        };
+    </script>
+</body>
+
+
+</html>

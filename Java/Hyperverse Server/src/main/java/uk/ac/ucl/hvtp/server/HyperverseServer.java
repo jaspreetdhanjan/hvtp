@@ -3,6 +3,8 @@ package uk.ac.ucl.hvtp.server;
 import uk.ac.ucl.hvtp.*;
 import uk.ac.ucl.hvtp.client.HyperverseClient;
 import uk.ac.ucl.hvtp.client.IHyperverseClient;
+import uk.ac.ucl.hvtp.websocket.HyperverseWebServer;
+import uk.ac.ucl.hvtp.websocket.HyperverseWebSocket;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -18,7 +20,7 @@ import java.util.logging.Logger;
 public class HyperverseServer implements Runnable, IHyperverseServer {
 	private static final Logger LOGGER = HyperverseLogger.getLogger(HyperverseServer.class.getName());
 
-	private final SceneGraph sceneGraph;
+	public static SceneGraph sceneGraph;
 
 	private volatile boolean running = false;
 	private ServerSocket socket;
@@ -31,7 +33,7 @@ public class HyperverseServer implements Runnable, IHyperverseServer {
 	};
 
 	public HyperverseServer(SceneGraph sceneGraph) {
-		this.sceneGraph = sceneGraph;
+		HyperverseServer.sceneGraph = sceneGraph;
 	}
 
 	@Override
@@ -49,6 +51,7 @@ public class HyperverseServer implements Runnable, IHyperverseServer {
 		}
 
 		pqp.start();
+		HyperverseWebServer.start();
 
 		LOGGER.log(Level.ALL, "Starting up server...");
 	}
@@ -122,6 +125,13 @@ public class HyperverseServer implements Runnable, IHyperverseServer {
 				LOGGER.log(Level.ALL, "ERROR retransmitting message to other clients");
 				e.printStackTrace();
 			}
+		}
+
+		try {
+			HyperverseWebSocket.broadcastAll(message.getPacket());
+		} catch (IOException e) {
+			LOGGER.log(Level.ALL, "ERROR retransmitting message to other clients");
+			e.printStackTrace();
 		}
 	}
 
