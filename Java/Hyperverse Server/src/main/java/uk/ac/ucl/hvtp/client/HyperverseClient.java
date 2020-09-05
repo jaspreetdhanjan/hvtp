@@ -12,6 +12,8 @@ import java.util.logging.Logger;
 public class HyperverseClient implements Runnable, IHyperverseClient {
 	private static final Logger LOGGER = HyperverseLogger.getLogger(HyperverseClient.class.getName());
 
+	private static final Logger RESULTS = HyperverseLogger.getBenchmarkLogger("INIT_transform");
+
 	private volatile boolean stop = false;
 
 	private Socket socket;
@@ -53,6 +55,8 @@ public class HyperverseClient implements Runnable, IHyperverseClient {
 		LOGGER.log(Level.ALL, String.format("Received message from %s", socket.toString()));
 
 		PacketHeader header = PacketSerializer.deserializeHeader(in);
+
+		RESULTS.log(Level.ALL, String.valueOf(header.getLength()));
 
 		byte[] payload = in.readNBytes(header.getLength());
 		return new Packet(header, payload);
