@@ -19,8 +19,10 @@ import java.util.Arrays;
 
 public class SceneGraph {
 //	private static final String PATH = "/test/ClientScene.glb";
-	private static final String PATH = "/floor.glb";
-//	private static final String PATH = "/hyperverse.glb";
+//	private static final String PATH = "/floor.glb";
+
+	// Hyperverse2 contains our scene nodes as UUID constants - so we can reference them in the TRNS packet.
+	private static final String PATH = "/BouncingBallScene.glb";
 
 	private volatile byte[] bytes;
 

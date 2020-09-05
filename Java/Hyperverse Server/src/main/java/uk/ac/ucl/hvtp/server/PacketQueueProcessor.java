@@ -1,7 +1,14 @@
 package uk.ac.ucl.hvtp.server;
 
 import uk.ac.ucl.hvtp.*;
+import uk.ac.ucl.hvtp.math.Vector4;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.logging.Level;
@@ -84,6 +91,25 @@ public class PacketQueueProcessor implements Runnable {
 				//sceneGraph.applyUpdate(payload);
 				break;
 			case HVTPConstants.TRNS:
+				// So we can't really modify our scene-graph here, yet. We'll need to import some glTF loader and
+				// a vecmath library in order for us to change our local scene-graph.
+
+				DataInputStream stream = new DataInputStream(new ByteArrayInputStream(payload));
+
+				try {
+					Vector4 rotation = Vector4.readBytes(stream);
+					Vector4 scale = Vector4.readBytes(stream);
+					Vector4 position = Vector4.readBytes(stream);
+					String nodeName = new String(Arrays.copyOfRange(payload, 48, payload.length), StandardCharsets.US_ASCII);
+
+					System.out.println("Rotation: " + rotation);
+					System.out.println("Scale: " + scale);
+					System.out.println("Position " + position);
+					System.out.println("Name " + nodeName);
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+
 				//sceneGraph.applyTranslation(payload);
 				break;
 			default:

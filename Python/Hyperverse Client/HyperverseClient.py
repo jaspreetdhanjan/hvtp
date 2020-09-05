@@ -11,6 +11,7 @@
 #   University College London                     #
 # #################################################
 
+import collections
 import socket
 import select
 import errno
@@ -21,6 +22,7 @@ import struct
 import os
 
 from pyrender import Mesh, Scene, Viewer, PointLight, SpotLight, DirectionalLight, Node
+import numpy as np
 
 from io import BytesIO
 import numpy as np
@@ -39,7 +41,7 @@ class HVTPClient:
         self.scene.add(DirectionalLight(color=[0.33, 0.33, 0.33], intensity=2.0))
 
         self.root_node = None
-        # self.scene.add_node(self.root_node)
+        self.reference_dictionary = {}
 
     def create(self, ip, port):
         """
@@ -102,13 +104,83 @@ class HVTPClient:
 
                 payload = self.client_socket.recv(hvtp_length)
 
-                loaded_payload = trimesh.load(BytesIO(payload), file_type='glb')
-               
-                mesh = Mesh.from_trimesh(list(loaded_payload.dump()))
-                
-                # Add to the scene
+                # Perform the relevant action on the payload
 
-                self.add_to_scene(mesh)
+                if hvtp_type == "INIT":
+                    self.loaded_payload = trimesh.load(BytesIO(payload), file_type='glb')
+
+                    # Clear anything we had before
+
+                    self.viewer.render_lock.acquire()
+
+                    for key in self.reference_dictionary.keys():
+                        self.scene.remove_node(self.reference_dictionary[key])
+
+                    self.viewer.render_lock.release()
+
+                    # Re add
+
+                    self.reference_dictionary = self.dump_to_dictionary(self.loaded_payload)
+
+                    # mesh = Mesh.from_trimesh(list(self.reference_dictionary.values()))
+
+                    # self.add_to_scene(list(reference_dictionary.values()))
+
+                elif hvtp_type == "TRNS":
+                    i = 0
+                    offs = 4
+
+                    # Rotation quaternion
+                    rx = struct.unpack('>f', payload[(i*offs):(offs + i*offs)])[0]
+                    i += 1
+                    ry = struct.unpack('>f', payload[(i*offs):(offs + i*offs)])[0]
+                    i += 1
+                    rz = struct.unpack('>f', payload[(i*offs):(offs + i*offs)])[0]
+                    i += 1
+                    rw = struct.unpack('>f', payload[(i*offs):(offs + i*offs)])[0]
+                    i += 1
+
+                    # Scale vector
+                    sx = struct.unpack('>f', payload[(i*offs):(offs + i*offs)])[0]
+                    i += 1
+                    sy = struct.unpack('>f', payload[(i*offs):(offs + i*offs)])[0]
+                    i += 1
+                    sz = struct.unpack('>f', payload[(i*offs):(offs + i*offs)])[0]
+                    i += 1
+                    sw = struct.unpack('>f', payload[(i*offs):(offs + i*offs)])[0]
+                    i += 1
+
+                    # Position vector
+                    px = struct.unpack('>f', payload[(i*offs):(offs + i*offs)])[0]
+                    i += 1
+                    py = struct.unpack('>f', payload[(i*offs):(offs + i*offs)])[0]
+                    i += 1
+                    pz = struct.unpack('>f', payload[(i*offs):(offs + i*offs)])[0]
+                    i += 1
+                    pw = struct.unpack('>f', payload[(i*offs):(offs + i*offs)])[0]
+                    i += 1
+
+                    # UUID
+                    uuid = payload[(i*offs):len(payload)].decode(HVTPConstants.HVTP_ENCODING)
+                    uuid = uuid[1:]
+
+                    if uuid == "RootScene":
+                        return
+
+                    print("UUID: " + uuid)
+
+                    quaternion = np.array([rx, ry, rz, rw])
+                    scale_vector = np.array([sx, sy, sz])
+                    translation_vector = np.array([px, py, pz])
+
+                    print(quaternion)
+                    print(scale_vector)
+                    print(translation_vector)
+                    # print(pw)
+
+                    self.reference_dictionary[uuid].rotation = quaternion
+                    self.reference_dictionary[uuid].scale = scale_vector
+                    self.reference_dictionary[uuid].translation = translation_vector
                 
             except IOError as e:
                 # This is normal on non blocking connections - when there are no incoming data error is going to be raised
@@ -125,25 +197,23 @@ class HVTPClient:
                 print('Reading error: {}'.format(str(e)))
                 sys.exit()
 
-    def add_to_scene(self, mesh):
-        """
-        """
 
-        # Grab the viewer mutex
+    def dump_to_dictionary(self, scene):
+        dic = {}
 
         self.viewer.render_lock.acquire()
 
-        # Remove anything before and insert the mesh into the scene-graph
+        for node_name in scene.graph.nodes_geometry:
+            transform, geometry_name = scene.graph[node_name]
 
-        if self.root_node != None:
-            self.scene.remove_node(self.root_node)
+            current = scene.geometry[geometry_name].copy()
+            current.apply_transform(transform)
 
-        self.root_node = self.scene.add(mesh)
-
-        # Release the viewer mutex
+            dic[node_name] = self.scene.add(Mesh.from_trimesh(current))
 
         self.viewer.render_lock.release()
 
+        return dic
 
 
 # Driver:

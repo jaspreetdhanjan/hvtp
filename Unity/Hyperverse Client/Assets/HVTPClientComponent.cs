@@ -3,6 +3,7 @@ using System.IO;
 using System.Collections;
 using System.Threading;
 using System.Collections.Generic;
+using System.Net;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEditor;
@@ -36,7 +37,8 @@ public class HVTPClientComponent : MonoBehaviour
 
     public GameObject hyperverseRoot;
 
-    private int dirtySize;
+    public static bool IsDirty = false;
+
 
     private string RetrieveTexturePath(UnityEngine.Texture texture)
     {
@@ -139,14 +141,13 @@ public class HVTPClientComponent : MonoBehaviour
         return transformations.ToArray();
     }
 
-
     // Start is called before the first frame update
     void Start()
     {
         client.Create("localhost", 8088, OnPacketReceived);
 
         // Check for changes in the scene-graph every 0.25 seconds, 5 seconds after start-up.
-        InvokeRepeating("CheckChanges", 5.0f, 0.25f);
+        InvokeRepeating("CheckChanges", 5.0f, 0.45f);
     }
 
     private void ResetSceneGraph()
@@ -164,6 +165,14 @@ public class HVTPClientComponent : MonoBehaviour
 
     private void CheckChanges()
     {
+        if (IsDirty)
+        {
+            Debug.Log("Scene is dirty. Sending new init packet");
+            Packet p = NewInitPacket(SaveGLB());
+            client.SendPacket(p);
+            IsDirty = false;
+        }
+
         if (hyperverseRoot != null)
         {
             Transform[] transforms = GetAllChildren(hyperverseRoot.transform);
@@ -173,20 +182,32 @@ public class HVTPClientComponent : MonoBehaviour
                 if (t.hasChanged)
                 {
                     t.hasChanged = false;
-                    OnChangeInHyperverse();
+
+                    if (t.name != "RootScene" || t.parent.name != "RootScene")
+                    { 
+                        OnChangeInHyperverse(t);
+                    }
+
                     break;
                 }
             }
         }
     }
     
-    private void OnChangeInHyperverse()
+    private void OnChangeInHyperverse(Transform transform)
     {
-        Debug.Log("Something has changed!! Sending packet...");
+        Debug.Log("Something has changed!! Sending TRNS packet...");
 
-        byte[] bytes = SaveGLB();
+        //byte[] bytes = SaveGLB();
 
-        Packet packet = NewInitPacket(bytes);
+        //Packet packet = NewInitPacket(bytes);
+
+        // For some reason, the GLTFSceneImporter creates the glTF Node and puts the geometry inside a child to the Node as 'Primitive'.
+        // To avoid this, use the parent name to apply the transform.
+
+        Packet packet = NewTrnsPacket(
+            PacketSerializer.ToTrnsPayload(transform.rotation, transform.localScale, transform.localPosition, transform.parent.name)
+        );
 
         client.SendPacket(packet);
 
@@ -196,6 +217,12 @@ public class HVTPClientComponent : MonoBehaviour
     private Packet NewInitPacket(byte[] payload)
     {
         PacketHeader header = new PacketHeader("HVTP", 1, "INIT", payload.Length);
+        return new Packet(header, payload);
+    }
+
+    private Packet NewTrnsPacket(byte[] payload)
+    {
+        PacketHeader header = new PacketHeader("HVTP", 1, "TRNS", payload.Length);
         return new Packet(header, payload);
     }
 

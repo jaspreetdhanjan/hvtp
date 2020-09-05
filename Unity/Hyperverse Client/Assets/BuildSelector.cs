@@ -1,6 +1,8 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using HVTP;
 
 public class BuildSelector : MonoBehaviour
 {
@@ -8,7 +10,7 @@ public class BuildSelector : MonoBehaviour
 
     public GameObject hyperverseRoot;
 
-    private readonly float rayLength = 5.0f;
+    private readonly float rayLength = 15.0f;
 
     private Transform _selection = null;
     private Transform _lastSelection = null;
@@ -39,6 +41,12 @@ public class BuildSelector : MonoBehaviour
                 Destroy(_selection.gameObject);
             }
 
+            if (Input.GetKeyDown(KeyCode.Space))
+            {
+                Rigidbody body = _selection.gameObject.AddComponent<Rigidbody>();
+                body.mass = 0.52f;
+            }
+
             _lastSelection = _selection;
             _selection = null;
         }
@@ -64,9 +72,21 @@ public class BuildSelector : MonoBehaviour
 
         if (Input.GetKeyDown(KeyCode.Insert))
         {
-            var cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            cube.transform.position = pos;
-            cube.transform.parent = hyperverseRoot.transform;
+            //var sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            //sphere.transform.position = pos;
+            //sphere.transform.parent = hyperverseRoot.transform;
+            //sphere.transform.name = System.Guid.NewGuid().ToString();
+
+            //Rigidbody sphereBody = sphere.AddComponent<Rigidbody>();
+            //sphereBody.mass = 2;
+
+            // So we can send changes to the server.
+            //HVTPClientComponent.IsDirty = true;
+
+
+            //var cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            //cube.transform.position = pos;
+            //cube.transform.parent = hyperverseRoot.transform;
         }
 
         if (Input.GetMouseButton(0))    

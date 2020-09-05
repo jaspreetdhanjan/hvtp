@@ -501,6 +501,9 @@ namespace UnityGLTF
 
 			if (ExportNames)
 			{
+				// Add UUID here
+				//node.Name = System.Guid.NewGuid().ToString();
+
 				node.Name = nodeTransform.name;
 			}
 
