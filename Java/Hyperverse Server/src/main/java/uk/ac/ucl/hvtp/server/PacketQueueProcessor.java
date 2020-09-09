@@ -2,6 +2,7 @@ package uk.ac.ucl.hvtp.server;
 
 import uk.ac.ucl.hvtp.*;
 
+import java.io.FileOutputStream;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.logging.Level;
@@ -76,6 +77,12 @@ public class PacketQueueProcessor implements Runnable {
 	private void applyChange(String type, byte[] payload) {
 		SceneGraph sceneGraph = server.getSceneGraph();
 
+		if(payload.length < 20000) {
+			dump(payload, true);
+		} else {
+			dump(payload, false);
+		}
+
 		switch (type) {
 			case HVTPConstants.INIT:
 				sceneGraph.setBytes(payload);
@@ -90,6 +97,19 @@ public class PacketQueueProcessor implements Runnable {
 				LOGGER.log(Level.ALL, "Unsupported message type has been received... What do we do?");
 				break;
 		}
+	}
+
+	private void dump(byte[] payload, boolean isMin) {
+		try {
+			String name = isMin ? "min-"+System.currentTimeMillis() : "normal-"+System.currentTimeMillis();
+			FileOutputStream fos = new FileOutputStream(name+".glb");
+			fos.write(payload);
+			fos.close();
+		} catch(Exception e) {
+			e.printStackTrace();
+		}
+
+		System.out.println("Dumped");
 	}
 
 	public static void main(String[] args) {
